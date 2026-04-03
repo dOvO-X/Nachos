@@ -133,25 +133,24 @@ Initialize(int argc, char **argv)
 	}
 #endif
     }
-
-    DebugInit(debugArgs);			// initialize DEBUG messages
-    stats = new Statistics();			// collect statistics
-    interrupt = new Interrupt;			// start up interrupt handling
-    scheduler = new Scheduler();		// initialize the ready queue
-    if (randomYield)				// start the timer (if needed)
+//参数解析后，初始化核心组件
+    DebugInit(debugArgs);			// 初始化 DEBUG 日志
+    stats = new Statistics();			// 性能统计
+    interrupt = new Interrupt;			// start up 中断处理
+    scheduler = new Scheduler();		// 调度器，初始化 就绪队列
+    if (randomYield)				// 定时器（时间片） (if needed)
 	timer = new Timer(TimerInterruptHandler, 0, randomYield);
 
-    threadToBeDestroyed = NULL;
+    threadToBeDestroyed = NULL;//标记待销毁线程
 
-    // We didn't explicitly allocate the current thread we are running in.
-    // But if it ever tries to give up the CPU, we better have a Thread
-    // object to save its state. 
-    currentThread = new Thread("main");		
-    currentThread->setStatus(RUNNING);
+    //我们没有显式分配当前正在运行的线程，但如果它要放弃CPU，必须有Thread对象保存状态
+    //currentThread指向当前正在 CPU 上运行的线程
+    currentThread = new Thread("main");	//创建Thread对象，命名为"main"	
+    currentThread->setStatus(RUNNING);  //将该线程标记为“运行中”
 
     interrupt->Enable();
     CallOnUserAbort(Cleanup);			// if user hits ctl-C
-    
+//文件系统、用户程序、网络等初始化（if needed）
 #ifdef USER_PROGRAM
     machine = new Machine(debugUserProg);	// this must come first
 #endif

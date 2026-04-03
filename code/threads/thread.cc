@@ -32,7 +32,7 @@
 //	"threadName" is an arbitrary string, useful for debugging.
 //----------------------------------------------------------------------
 
-Thread::Thread(char* threadName)
+Thread::Thread(char* threadName)//为Nachos的 “主线程执行流” 分配线程控制块（TCB）
 {
     name = threadName;
     stackTop = NULL;

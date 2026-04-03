@@ -90,7 +90,7 @@ Scheduler::FindNextToRun ()
 void
 Scheduler::Run (Thread *nextThread)
 {
-    Thread *oldThread = currentThread;
+    Thread *oldThread = currentThread;//保存当前线程指针，以便后续切换回来
     
 #ifdef USER_PROGRAM			// ignore until running user programs 
     if (currentThread->space != NULL) {	// if this thread is a user program,
@@ -100,7 +100,7 @@ Scheduler::Run (Thread *nextThread)
 #endif
     
     oldThread->CheckOverflow();		    // check if the old thread
-					                    // had an undetected stack overflow
+					                    // had an 未检测到的堆栈溢出
 
     currentThread = nextThread;		    // switch to the next thread
     currentThread->setStatus(RUNNING);      // nextThread is now running
@@ -114,14 +114,14 @@ Scheduler::Run (Thread *nextThread)
     // a bit to figure out what happens after this, both from the point
     // of view of the thread and from the perspective of the "outside world".
 
-    SWITCH(oldThread, nextThread);
+    SWITCH(oldThread, nextThread);//进入汇编，保存当前线程状态，切换到新线程，并恢复新线程状态
     
     DEBUG('t', "Now in thread \"%s\"\n", currentThread->getName());
 
-    // If the old thread gave up the processor because it was finishing,
-    // we need to delete its carcass.  Note we cannot delete the thread
-    // before now (for example, in Thread::Finish()), because up to this
-    // point, we were still running on the old thread's stack!
+    // 如果旧线程因为即将完成而放弃处理器，
+    // 我们需要删除它的“残骸”。
+    // 注意，在此之前（例如，在Thread::Finish()中），我们不能删除该线程，
+    // 因为到目前为止，我们仍然在旧线程的堆栈上运行！
     if (threadToBeDestroyed != NULL) {
         delete threadToBeDestroyed;
 	    threadToBeDestroyed = NULL;

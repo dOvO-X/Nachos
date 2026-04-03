@@ -83,13 +83,13 @@ extern void SynchTest(void);
 //----------------------------------------------------------------------
 
 int
-main(int argc, char **argv)
+main(int argc, char **argv)//argc参数总数（含程序名），argv参数数组（每个元素是一个参数字符串）
 {
     int argCount;			// the number of arguments 
 					// for a particular command
-
+    //main处理功能参数，system.cc->Initialize(argc, argv)处理系统参数
     DEBUG('t', "Entering main");
-    (void) Initialize(argc, argv);
+    (void) Initialize(argc, argv);//system.cc->Initialize(argc, argv),初始化全局系统
     
 #ifdef THREADS
     ThreadTest();
