@@ -28,10 +28,9 @@ slot::slot(int id, int number)
 
 //----------------------------------------------------------------------
 // Ring::Ring
-// 	The constructor for the Ring class.  Note that it doesn't have a
-// 	return type.
+// 	Ring 类的构造函数。注意：构造函数没有返回类型。
 //
-// 	"sz" -- maximum number of elements in the ring buffer at any time
+// 	参数 "sz" —— 环形缓冲区在任意时刻可容纳的最大元素数量（即槽位数量）。
 //----------------------------------------------------------------------
 
 Ring::Ring(int sz)
@@ -45,7 +44,7 @@ Ring::Ring(int sz)
     size = sz;
     in = 0;
     out = 0;
-    buffer = new slot[size]; //allocate an array of slots.
+    buffer = new slot[size]; // 分配一个 slot 类型的数组
 }
 
 //----------------------------------------------------------------------
@@ -65,10 +64,9 @@ Ring::~Ring()
 
 //----------------------------------------------------------------------
 // Ring::Put
-// 	Put a message into the next available empty slot. We assume the
-//       caller has done necesaary synchronization.
+// 	将消息放入下一个可用的空槽位中。假设调用者已完成必要的同步操作。
 //
-//	"message" -- the message to be put in the buffer
+// 	参数 "message" —— 要放入缓冲区的消息
 //----------------------------------------------------------------------
 
 void
@@ -81,10 +79,9 @@ Ring::Put(slot *message)
 
 //----------------------------------------------------------------------
 // Ring::Get
-// 	Get a message from the next full slot. We assume the
-//       caller has done necesaary synchronization.
+// 	从下一个已满的槽位中取出消息。假设调用者已完成必要的同步操作。
 //
-//	"message" -- the message from  the buffer
+// 	参数 "message" —— 从缓冲区取出的消息（输出参数）
 //----------------------------------------------------------------------
 
 void

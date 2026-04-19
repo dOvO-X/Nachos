@@ -7,13 +7,12 @@
 // of liability and disclaimer of warranty provisions.
 
 
-// The following defines the ring buffer class.  The functions are
-// implemented in the file ring.cc.
+// 以下代码定义了环形缓冲区类。该类的函数实现位于 ring.cc 文件中。
 //
-// The constructor (initializer) for the ring burrer is passed with an
-// integer for the size of the buffer (the number of slots). 
+// 环形缓冲区的构造函数（初始化函数）接收一个整数参数，
+// 用于指定缓冲区的大小（即槽位数量）。
 
-// class of the slot in the ring-buffer
+// 环形缓冲区中单个槽位的类
 class slot {
     public:
     slot(int id, int number);
@@ -30,17 +29,17 @@ class Ring {
     ~Ring();         // Destructor:   deallocate space allocated above.
 
     
-    void Put(slot *message); // Put a message the next empty slot.
+    void Put(slot *message); // 将消息放入下一个空的槽位。
     
-    void Get(slot *message); // Get a message from the next  full slot.
+    void Get(slot *message); // 从下一个已填充的槽位中取出消息。
                                             
-    int Full();       // Returns non-0 if the ring is full, 0 otherwise.
-    int Empty();      // Returns non-0 if the ring is empty, 0 otherwise.
+    int Full();       // 若环形缓冲区已满则返回非 0 值，否则返回 0。
+    int Empty();      // 若环形缓冲区为空则返回非 0 值，否则返回 0。
     
   private:
     int size;         // The size of the ring buffer.
-    int in, out;      // Index of 
-    slot *buffer;       // A pointer to an array for the ring buffer.
+    int in, out;      // 入/出缓冲区的索引
+    slot *buffer;       // 指向环形缓冲区数组的指针。
 };
 
 

@@ -140,19 +140,18 @@ Interrupt::Enable()
 
 //----------------------------------------------------------------------
 // Interrupt::OneTick
-// 	Advance simulated time and check if there are any pending 
-//	interrupts to be called. 
+// 	推进模拟时间，并检查是否有任何待处理的中断需要调用。
 //
-//	Two things can cause OneTick to be called:
-//		interrupts are re-enabled
-//		a user instruction is executed
+// 	有两种情况会导致 OneTick 被调用：
+//		1. 中断被重新启用时
+//		2. 执行了一条用户指令时
 //----------------------------------------------------------------------
 void
 Interrupt::OneTick()
 {
     MachineStatus old = status;
 
-// advance simulated time
+    // 推进模拟时间
     if (status == SystemMode) {
         stats->totalTicks += SystemTick;
 	stats->systemTicks += SystemTick;
@@ -162,15 +161,14 @@ Interrupt::OneTick()
     }
     DEBUG('i', "\n== Tick %d ==\n", stats->totalTicks);
 
-// check any pending interrupts are now ready to fire
+// 检查是否有任何待处理的中断现在可以触发了
     ChangeLevel(IntOn, IntOff);		// first, turn off interrupts
 					// (interrupt handlers run with
 					// interrupts disabled)
-    while (CheckIfDue(FALSE))		// check for pending interrupts
+    while (CheckIfDue(FALSE))		// 检查待处理的中断
 	;
     ChangeLevel(IntOff, IntOn);		// re-enable interrupts
-    if (yieldOnReturn) {		// if the timer device handler asked 
-					// for a context switch, ok to do it now
+    if (yieldOnReturn) {		// 如果定时器设备处理程序请求了上下文切换，现在可以执行了
 	yieldOnReturn = FALSE;
  	status = SystemMode;		// yield is a kernel routine
 	currentThread->Yield();     // RR scheduler
