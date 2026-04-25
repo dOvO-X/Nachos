@@ -34,27 +34,28 @@ static void DiskDone(_int arg) { ((Disk *)arg)->HandleInterrupt(); }
 //	if it doesn't exist), and check the magic number to make sure it's 
 // 	ok to treat it as Nachos disk storage.
 //
-//	"name" -- text name of the file simulating the Nachos disk
-//	"callWhenDone" -- interrupt handler to be called when disk read/write
-//	   request completes
-//	"callArg" -- argument to pass the interrupt handler
+//	"name" --模拟磁盘的 UNIX 文件名
+//	"callWhenDone" -- I/O 完成后触发的中断回调函数
+//	"callArg" -- 传给回调函数的参数（上层 SynchDisk 实例指针）
 //----------------------------------------------------------------------
 
 Disk::Disk(char* name, VoidFunctionPtr callWhenDone, _int callArg)
 {
+    //初始化状态变量与回调
     int magicNum;
     int tmp = 0;
 
     DEBUG('d', "Initializing the disk, 0x%x 0x%x\n", callWhenDone, callArg);
     handler = callWhenDone;
     handlerArg = callArg;
-    lastSector = 0;
-    bufferInit = 0;
-    
+    lastSector = 0;// 记录上一次访问的扇区
+    bufferInit = 0;// 磁道缓冲区初始化时间
+
+    // 创建/打开模拟磁盘的UNIX文件
     fileno = OpenForReadWrite(name, FALSE);
-    if (fileno >= 0) {		 	// file exists, check magic number 
+    if (fileno >= 0) {		 	// 文件已存在：验证硬盘标识（防止误操作普通文件）
 	Read(fileno, (char *) &magicNum, MagicSize);
-	ASSERT(magicNum == MagicNumber);
+	ASSERT(magicNum == MagicNumber);// 硬盘标识=0x456789ab，验证是Nachos磁盘文件
     } else {				// file doesn't exist, create it
         fileno = OpenForWrite(name);
 	magicNum = MagicNumber;  
@@ -64,7 +65,7 @@ Disk::Disk(char* name, VoidFunctionPtr callWhenDone, _int callArg)
         Lseek(fileno, DiskSize - sizeof(int), 0);	
 	WriteFile(fileno, (char *)&tmp, sizeof(int));  
     }
-    active = FALSE;
+    active = FALSE;// 标记磁盘是否正在处理I/O（同一时间仅支持一个请求）
 }
 
 //----------------------------------------------------------------------
@@ -115,7 +116,7 @@ PrintSector (bool writing, int sector, char *data)
 void
 Disk::ReadRequest(int sectorNumber, char* data)
 {
-    int ticks = ComputeLatency(sectorNumber, FALSE);
+    int ticks = ComputeLatency(sectorNumber, FALSE);//ComputeLatency 计算 I/O 总延迟
 
     ASSERT(!active);				// only one request at a time
     ASSERT((sectorNumber >= 0) && (sectorNumber < NumSectors));

@@ -39,12 +39,12 @@ DiskRequestDone (_int arg)
 //	"name" -- UNIX file name to be used as storage for the disk data
 //	   (usually, "DISK")
 //----------------------------------------------------------------------
-
+//初始化同步原语，解决多线程并发访问
 SynchDisk::SynchDisk(char* name)
 {
-    semaphore = new Semaphore("synch disk", 0);
-    lock = new Lock("synch disk lock");
-    disk = new Disk(name, DiskRequestDone, (_int) this);
+    semaphore = new Semaphore("synch disk", 0); // 信号量（初始值0，用于阻塞等待I/O完成）
+    lock = new Lock("synch disk lock");         // 互斥锁,防止多线程同时调用 Disk 的 ReadRequest/WriteRequest
+    disk = new Disk(name, DiskRequestDone, (_int) this);// 实例化底层Disk，绑定同步回调
 }
 
 //----------------------------------------------------------------------
@@ -98,7 +98,7 @@ SynchDisk::WriteSector(int sectorNumber, char* data)
 
 //----------------------------------------------------------------------
 // SynchDisk::RequestDone
-// 	Disk interrupt handler.  Wake up any thread waiting for the disk
+// 	Disk interrupt handler.唤醒阻塞线程
 //	request to finish.
 //----------------------------------------------------------------------
 

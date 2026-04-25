@@ -81,21 +81,21 @@ FileSystem::FileSystem(bool format)
 { 
     DEBUG('f', "Initializing the file system.\n");
     if (format) {
-        BitMap *freeMap = new BitMap(NumSectors);    //free sector map
+        BitMap *freeMap = new BitMap(NumSectors);    //空闲扇区位图
         Directory *directory = new Directory(NumDirEntries); //initialize the directory table
-	FileHeader *mapHdr = new FileHeader;
-	FileHeader *dirHdr = new FileHeader;
+	FileHeader *mapHdr = new FileHeader; // 位图文件的文件头
+	FileHeader *dirHdr = new FileHeader; // 目录文件的文件头
 
         DEBUG('f', "Formatting the file system.\n");
 
-    // First, allocate space for FileHeaders for the directory and bitmap
+    // First, 预留元数据文件头的扇区
     // (make sure no one else grabs these!)
+    //位图/目录的文件头必须固定在扇区0/1，因此先通过位图标记这两个扇区为"已用"，防止后续被分配给其他文件
 	freeMap->Mark(FreeMapSector);	    
 	freeMap->Mark(DirectorySector);
 
-    // Second, allocate space for the data blocks containing the contents
-    // of the directory and bitmap files.  There better be enough space!
-
+    // Second, 为位图/目录文件分配数据块.  There better be enough space!
+    // ASSERT 确保分配成功
 	ASSERT(mapHdr->Allocate(freeMap, FreeMapFileSize));
 	ASSERT(dirHdr->Allocate(freeMap, DirectoryFileSize));
 
@@ -103,7 +103,7 @@ FileSystem::FileSystem(bool format)
     // We need to do this before we can "Open" the file, since open
     // reads the file header off of disk (and currently the disk has garbage
     // on it!).
-
+    // 将文件头写入磁盘固定扇区
         DEBUG('f', "Writing headers back to disk.\n");
 	mapHdr->WriteBack(FreeMapSector);    
 	dirHdr->WriteBack(DirectorySector);
@@ -111,7 +111,7 @@ FileSystem::FileSystem(bool format)
     // OK to open the bitmap and directory files now
     // The file system operations assume these two files are left open
     // while Nachos is running.
-
+    // 打开位图和目录文件
         freeMapFile = new OpenFile(FreeMapSector);
         directoryFile = new OpenFile(DirectorySector);
      
@@ -122,6 +122,7 @@ FileSystem::FileSystem(bool format)
     // to hold the file data for the directory and bitmap.
 
         DEBUG('f', "Writing bitmap and directory back to disk.\n");
+    // 将初始化后的元数据刷入磁盘
 	freeMap->WriteBack(freeMapFile);	 // flush changes to disk
 	directory->WriteBack(directoryFile);
 
