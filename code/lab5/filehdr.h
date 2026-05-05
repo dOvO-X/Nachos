@@ -37,9 +37,14 @@
 
 class FileHeader {
   public:
+    FileHeader();//初始化文件头，包括将文件数据块在磁盘上分配空间
+
     bool Allocate(BitMap *bitMap, int fileSize);// Initialize a file header, 
 						//  including allocating space 
 						//  on disk for the file data
+    bool Allocate(BitMap *bitMap, int fileSize, int incrementBytes); //在一个已有文件后追加数据，更新文件头信息，
+                                                                    // 包括分配新的磁盘块（如果需要）和更新文件大小
+
     void Deallocate(BitMap *bitMap);  		// De-allocate this file's 
 						//  data blocks
 

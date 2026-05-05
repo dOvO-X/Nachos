@@ -339,3 +339,15 @@ FileSystem::Print()
     delete freeMap;
     delete directory;
 } 
+
+//类FileSystem维护了两个一直处于打开状态的文件句柄freeMapFile与directoryFile;
+//一个是硬盘DISK上的位示图文件，一个DISK上的目录文件
+BitMap* FileSystem::getBitMap() { //numSector: DISK 上总扇区数（共有32*32=1024个扇区） 
+    BitMap *freeBitMap = new BitMap(NumSectors);   
+    freeBitMap->FetchFrom(freeMapFile); 
+    return freeBitMap; 
+} 
+
+void FileSystem::setBitMap(BitMap* freeMap) { 
+    freeMap->WriteBack(freeMapFile); 
+}

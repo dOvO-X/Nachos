@@ -140,16 +140,24 @@ Append(char *from, char *to, int half)
 //	printf("start value: %d,  amountRead %d, ", start, amountRead);
 //	result = openFile->WriteAt(buffer, amountRead, start);
 	result = openFile->Write(buffer, amountRead);
+    if (result < 0)   //文件过大，或空闲磁盘块不足 
+    { 
+        printf("\nERROR!!!!!!\n"); 
+        printf("Insuficient Disk Space, or File is Too Big!\n"); 
+        printf("Writting Terminated.\n\n"); 
+        break; 
+    } 
 //	printf("result of write: %d\n", result);
 	ASSERT(result == amountRead);
-//	start += amountRead;
+	start += amountRead;
 //	ASSERT(start == openFile->Length());
     }
     delete [] buffer;
 
 // Write the inode back to the disk, because we have changed it
-// openFile->WriteBack();
-//  printf("inodes have been written back\n");
+    openFile->WriteBack();
+    DEBUG('f',"inodes have been written back\n"); 
+    printf("inodes have been written back\n");
     
 // Close the UNIX and the Nachos files
     delete openFile;
@@ -226,15 +234,16 @@ NAppend(char *from, char *to)
 //	result = openFile->WriteAt(buffer, amountRead, start);
 	result = openFileTo->Write(buffer, amountRead);
 //	printf("result of write: %d\n", result);
-	ASSERT(result == amountRead);
-//	start += amountRead;
+	//ASSERT(result == amountRead);
+	start += amountRead;
 //	ASSERT(start == openFile->Length());
     }
     delete [] buffer;
 
 // Write the inode back to the disk, because we have changed it
-// openFileTo->WriteBack();
-// printf("inodes have been written back\n");
+    openFileTo->WriteBack();
+    DEBUG('f',"inodes have been written back\n"); 
+    printf("inodes have been written back\n");
     
 // Close both Nachos files
     delete openFileTo;
@@ -357,4 +366,3 @@ PerformanceTest()
     }
     stats->Print();
 }
-

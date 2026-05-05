@@ -29,6 +29,7 @@ OpenFile::OpenFile(int sector)
     hdr = new FileHeader;
     hdr->FetchFrom(sector);
     seekPosition = 0;
+    hdrSector=sector;   //打开文件的文件头所在的扇区号 
 }
 
 //----------------------------------------------------------------------
@@ -147,11 +148,18 @@ OpenFile::WriteAt(char *from, int numBytes, int position)
     int i, firstSector, lastSector, numSectors;
     bool firstAligned, lastAligned;
     char *buf;
-
-    if ((numBytes <= 0) || (position >= fileLength))
+    // 两个约束
+    if ((numBytes <= 0) || (position < 0))
 	return 0;				// check request
-    if ((position + numBytes) > fileLength)
-	numBytes = fileLength - position;
+    if ((position + numBytes) > fileLength){  
+        int incrementBytes = (position + numBytes) - fileLength; 
+        BitMap *freeBitMap = fileSystem-> getBitMap();    
+        bool hdrRet; 
+        hdrRet = hdr->Allocate(freeBitMap, fileLength, incrementBytes);   
+        if ( !hdrRet ) return -1;  //超出disk空间或者文件大小过大
+          
+        fileSystem-> setBitMap(freeBitMap);
+    } 
     DEBUG('f', "Writing %d bytes at %d, from file of length %d.\n", 	
 			numBytes, position, fileLength);
 
@@ -192,3 +200,7 @@ OpenFile::Length()
 { 
     return hdr->FileLength(); 
 }
+
+void OpenFile::WriteBack() { 
+    hdr-> WriteBack(hdrSector); 
+} 

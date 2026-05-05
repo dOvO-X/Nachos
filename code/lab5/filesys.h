@@ -37,6 +37,7 @@
 
 #include "copyright.h"
 #include "openfile.h"
+#include "bitmap.h"
 
 #ifdef FILESYS_STUB 		// Temporarily implement file system calls as 
 				// calls to UNIX, until the real file system
@@ -85,6 +86,9 @@ class FileSystem {
 
     void Print();			// List all the files and their contents
 
+    BitMap* getBitMap();
+    void setBitMap(BitMap * freemap);
+	
   private:
    OpenFile* freeMapFile;		// Bit map of free disk blocks,
 					// represented as a file

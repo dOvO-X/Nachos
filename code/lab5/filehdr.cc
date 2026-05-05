@@ -27,6 +27,16 @@
 #include "system.h"
 #include "filehdr.h"
 
+FileHeader:: FileHeader() 
+{ 
+    numBytes=0;     //文件大小  
+    numSectors=0;   //文件扇区数 
+    for (int i=0;i<NumDirect;i++)  // NumDirect=30：文件最多拥有的扇区数    
+        dataSectors[i]=0;  //文件扇区索引表，每个元素存储一个扇区号，指向文件数据所在的扇区
+}
+
+
+
 //----------------------------------------------------------------------
 // FileHeader::Allocate
 // 	Initialize a fresh file header for a newly created file.
@@ -50,6 +60,39 @@ FileHeader::Allocate(BitMap *freeMap, int fileSize)
 	     dataSectors[i] = freeMap->Find();
     return TRUE;
 }
+
+bool FileHeader::Allocate(BitMap *freeMap, int fileSize, int incrementBytes)  { 
+    if (numSectors > 30)    //限定每个文件最多可分配30个扇区 
+        return false;        //超出限定的文件大小（文件最大限定128*30个字节） 
+    if ( (fileSize==0) &&( incrementBytes>0) ) {  //在一个空文件后追加数据 
+        if (freeMap->NumClear() <1)     //至少需要一个扇区块 
+            return false;      //磁盘已满，无空闲扇区可分配 
+        //为添加数据先分配一个空闲磁盘块，并更新文件头信息 
+        dataSectors[0] = freeMap->Find(); 
+        numSectors = 1;   
+        numBytes = 0; 
+    }    
+    numBytes=fileSize; 
+    int offset= numBytes % SectorSize;  //原文件最后一个扇区块数据偏移量 
+    int newSectorBytes = incrementBytes  - (SectorSize - (offset + 1)); 
+    //最后一个扇区块剩余空间足以容纳追加数据, 不需分配新的扇区块 
+    if (newSectorBytes <= 0 ) {   
+        numBytes = numBytes + incrementBytes;   //更新文件头中的文件大小 
+        return TRUE;  
+    } 
+    //最后一个扇区的剩余空间不足以容纳要写入的数据，分配新的磁盘块 
+    int moreSectors = divRoundUp(newSectorBytes, SectorSize);  //新加扇区块数 
+    if (numSectors + moreSectors > 30) 
+        return FALSE;  //文件过大，超出30个磁盘块 
+    if (freeMap->NumClear() < moreSectors)  //磁盘无足够的空闲块 
+        return false;  
+    //没有超出文件大小的限制，并且磁盘有足够的空闲块 
+    for ( int i = numSectors; i < numSectors + moreSectors; i++ )  
+        dataSectors[i] =  freeMap->Find();  
+    numBytes = numBytes + incrementBytes;   //更新文件大小 
+    numSectors = numSectors + moreSectors;    //更新文件扇区块数 
+    return TRUE;  
+} 
 
 //----------------------------------------------------------------------
 // FileHeader::Deallocate

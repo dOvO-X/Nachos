@@ -85,10 +85,12 @@ class OpenFile {
 					// file (this interface is simpler 
 					// than the UNIX idiom -- lseek to 
 					// end of file, tell, lseek back 
+	void WriteBack();			//将内存中的文件头写回磁盘
     
   private:
     FileHeader *hdr;			// Header for this file 
     int seekPosition;			// Current position within the file
+	int hdrSector;   			//打开文件的文件头所在的扇区号
 };
 
 #endif // FILESYS
