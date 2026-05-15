@@ -13,8 +13,15 @@
 #ifndef ADDRSPACE_H
 #define ADDRSPACE_H
 
+// typedef int SpaceId;
+
 #include "copyright.h"
 #include "filesys.h"
+#include <set>
+#include "translate.h"
+#include "syscall.h"
+#include "bitmap.h"
+
 
 #define UserStackSize		1024 	// increase this as necessary!
 
@@ -32,11 +39,23 @@ class AddrSpace {
     void RestoreState();		// info on a context switch 
     void Print();			// Print the address space (debugging)
 
+    SpaceId getSpaceID(){ return pid; };
+
+    static int globalPid;//全局变量，记录当前分配的最大PID值，每创建一个新的地址空间时，globalPid加1，并将新的PID值分配给新创建的地址空间。
+    static std::set<SpaceId> pids;
+    //全局变量，使用一个集合来记录当前正在使用的PID值。
+    // 当创建一个新的地址空间时，将新的PID值添加到集合中；
+    // 当一个地址空间退出时，将对应的PID值从集合中移除。
+    // 通过检查集合中的PID值，可以确保每个地址空间都有一个唯一的PID，
+    // 并且在地址空间退出后，PID值可以被重新分配给新的地址空间。
+    static BitMap memfreemap;//全局变量，使用一个位图来管理内存页的分配情况。
+
   private:
     TranslationEntry *pageTable;	// Assume linear page table translation
 					// for now!
     unsigned int numPages;		// Number of pages in the virtual 
 					// address space
+    SpaceId pid; 
 };
 
 #endif // ADDRSPACE_H

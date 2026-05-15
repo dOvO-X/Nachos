@@ -34,6 +34,7 @@
 
 Thread::Thread(char* threadName)//为Nachos的 “主线程执行流” 分配线程控制块（TCB）
 {
+    exitCode = -1024;//默认退出码为-1024，表示未设置退出码
     name = threadName;
     stackTop = NULL;
     stack = NULL;

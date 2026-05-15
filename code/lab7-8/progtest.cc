@@ -33,7 +33,7 @@ StartProcess(char *filename)
     space = new AddrSpace(executable);//创建地址空间对象，将用户进程映射到核心线程
     currentThread->space = space;//将当前线程的地址空间指针 currentThread->space 设为新建的 AddrSpace对象 
 
-    space->Print();
+    //space->Print();
 
     delete executable;			// close file
 
@@ -42,9 +42,23 @@ StartProcess(char *filename)
 
     machine->Run();			// 跳转到用户程序入口，开始执行用户代码。
     ASSERT(FALSE);			// machine->Run never returns;
-					// the address space exits
-					// by doing the syscall "exit"
+					        // the address space exits
+					        // by doing the syscall "exit"
 }
+
+void StartProcess(int spaceId)
+{
+    currentThread->space->Print();
+
+    currentThread->space->InitRegisters();//初始化寄存器值
+    currentThread->space->RestoreState(); // 加载页表 register
+
+    machine->Run();// 跳转到用户程序入口，开始执行用户代码。
+    ASSERT(FALSE); // machine->Run never returns;
+                   // the address space exits
+                   // by doing the syscall "exit"
+}
+
 
 // Data structures needed for the console test.  Threads making
 // I/O requests wait on a Semaphore to delay until the I/O completes.

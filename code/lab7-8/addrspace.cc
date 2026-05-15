@@ -19,6 +19,15 @@
 #include "system.h"
 #include "addrspace.h"
 #include "noff.h"
+// #include <set>
+// #include "bitmap.h"
+
+
+//----------------------------------------------------------------------
+//pid和内存管理相关的全局变量
+int AddrSpace::globalPid = 100;
+std::set<SpaceId> AddrSpace::pids;
+BitMap AddrSpace::memfreemap(NumPhysPages);
 
 //----------------------------------------------------------------------
 // SwapHeader
@@ -59,6 +68,37 @@ SwapHeader (NoffHeader *noffH)
 
 AddrSpace::AddrSpace(OpenFile *executable)
 {
+    //为每个地址空间分配一个唯一的PID
+    if (pids.count(globalPid) == 0)
+    {
+        //如果当前 globalPid 没有被占用，则直接分配给新创建的地址空间，
+        //并将 globalPid 加 1，以便下一个地址空间使用。
+        pid = globalPid;
+        globalPid++;
+        if (globalPid == 1024)//如果 globalPid 达到 1024，则重新从100开始分配 PID。
+            globalPid = 100;
+        pids.insert(pid);
+    } else
+    {
+        //如果当前 globalPid 已经被占用，则继续增加 globalPid，直到找到一个未被占用的 PID。
+        int prepid = globalPid;
+        while (pids.count(globalPid))
+        {
+            globalPid++;
+            if (globalPid == 1024)
+                globalPid = 100;
+            if (globalPid == prepid)
+            {
+                printf("exceed max processes");
+                interrupt->Halt();
+            }
+        }
+        pid = globalPid;
+        globalPid++;
+        if (globalPid == 1024)
+            globalPid = 100;
+        pids.insert(pid);
+    } 
     NoffHeader noffH;
     unsigned int i, size;
 //读取可执行文件的头部（NoffHeader）
@@ -82,8 +122,11 @@ AddrSpace::AddrSpace(OpenFile *executable)
 // 设置页表项的有效位、只读位等属性
     pageTable = new TranslationEntry[numPages];//为每一页分配一个页表项
     for (i = 0; i < numPages; i++) {
-	pageTable[i].virtualPage = i;	// for now,虚页号=物理页号，即1:1映射,所有页都直接映射到物理内存。
-	pageTable[i].physicalPage = i;
+	pageTable[i].virtualPage = i;	
+	// pageTable[i].physicalPage = i;
+    // 为页表项从memfreemap位图中分配一个物理页，并将该页标记为已使用
+    pageTable[i].physicalPage = memfreemap.Find();
+    ASSERT(pageTable[i].physicalPage != -1);
 	pageTable[i].valid = TRUE;
 	pageTable[i].use = FALSE;
 	pageTable[i].dirty = FALSE;
@@ -94,24 +137,75 @@ AddrSpace::AddrSpace(OpenFile *executable)
     
 // 清零内存
 // 用 bzero 将整个用户地址空间（包括未初始化数据段和栈）清零，以确保未初始化数据段和栈中的内容为零。这是因为在 C/C++ 中，未初始化的全局变量和局部变量的值是不确定的，可能包含垃圾值。通过清零内存，可以确保这些变量在程序开始执行时具有确定的初始值。
-    bzero(machine->mainMemory, size);
+    //bzero(machine->mainMemory, size);
 
-// 加载代码和数据段
-    //如果代码段大小大于 0，则将代码段内容从可执行文件读入内存的指定位置。
-    if (noffH.code.size > 0) {
-        DEBUG('a', "Initializing code segment, at 0x%x, size %d\n", 
-			noffH.code.virtualAddr, noffH.code.size);
-        executable->ReadAt(&(machine->mainMemory[noffH.code.virtualAddr]),
-			noffH.code.size, noffH.code.inFileAddr);
+// // 加载代码和数据段
+//     //如果代码段大小大于 0，则将代码段内容从可执行文件读入内存的指定位置。
+//     if (noffH.code.size > 0) {
+//         DEBUG('a', "Initializing code segment, at 0x%x, size %d\n", 
+// 			noffH.code.virtualAddr, noffH.code.size);
+//         executable->ReadAt(&(machine->mainMemory[noffH.code.virtualAddr]),
+// 			noffH.code.size, noffH.code.inFileAddr);
+//     }
+//     //如果已初始化数据段大小大于 0，则将已初始化数据段内容从可执行文件读入内存的指定位置。
+//     if (noffH.initData.size > 0) {
+//         DEBUG('a', "Initializing data segment, at 0x%x, size %d\n", 
+// 			noffH.initData.virtualAddr, noffH.initData.size);
+//         executable->ReadAt(&(machine->mainMemory[noffH.initData.virtualAddr]),
+// 			noffH.initData.size, noffH.initData.inFileAddr);
+//     }
+    // 通过一个循环来处理代码段、已初始化数据段和未初始化数据段这三个部分，
+    // 确保它们正确地加载到内存中，处理了跨页的情况。
+    int reCodeSize = noffH.code.size;//记录代码段剩余未加载的大小
+    int reIdataSize = noffH.initData.size;//记录已初始化数据段剩余未加载的大小
+    int reUdataSize = noffH.uninitData.size + UserStackSize;//记录未初始化数据段和栈剩余未加载的大小
+    i = 0;//记录当前正在处理的页表项索引，从第0页开始加载。
+    int currentSize = PageSize;//记录当前页剩余的大小，初始值为一页的大小
+    while (reCodeSize || reIdataSize || reUdataSize)
+    {
+        int phyPos = pageTable[i].physicalPage * PageSize + PageSize - currentSize;
+        if (reCodeSize)//如果代码段还有未加载的部分，则优先加载代码段
+        {
+            int writedSize = noffH.code.size - reCodeSize;
+            if (currentSize > reCodeSize)
+            {
+                executable->ReadAt(&(machine->mainMemory[phyPos]),
+                                   reCodeSize, noffH.code.inFileAddr + writedSize);
+                currentSize -= reCodeSize;
+                reCodeSize = 0;
+            } else
+            {
+                executable->ReadAt(&(machine->mainMemory[phyPos]),
+                                   currentSize, noffH.code.inFileAddr + writedSize);
+                reCodeSize -= currentSize;
+                i++;
+                currentSize = PageSize;
+            }
+        } else if (reIdataSize)
+        {
+            int writedSize = noffH.initData.size - reIdataSize;
+            if (currentSize > reIdataSize)
+            {
+                executable->ReadAt(&(machine->mainMemory[phyPos]),
+                                   reIdataSize, noffH.initData.inFileAddr + writedSize);
+                currentSize -= reIdataSize;
+                reIdataSize = 0;
+            } else
+            {
+                executable->ReadAt(&(machine->mainMemory[phyPos]),
+                                   currentSize, noffH.initData.inFileAddr + writedSize);
+                reIdataSize -= currentSize;
+                i++;
+                currentSize = PageSize;
+            }
+        } else if (reUdataSize > 0)
+        {
+            bzero(&(machine->mainMemory[phyPos]), currentSize);
+            i++;
+            currentSize = PageSize;
+            reUdataSize -= currentSize;
+        }    
     }
-    //如果已初始化数据段大小大于 0，则将已初始化数据段内容从可执行文件读入内存的指定位置。
-    if (noffH.initData.size > 0) {
-        DEBUG('a', "Initializing data segment, at 0x%x, size %d\n", 
-			noffH.initData.virtualAddr, noffH.initData.size);
-        executable->ReadAt(&(machine->mainMemory[noffH.initData.virtualAddr]),
-			noffH.initData.size, noffH.initData.inFileAddr);
-    }
-
 }
 
 //----------------------------------------------------------------------
@@ -122,6 +216,13 @@ AddrSpace::AddrSpace(OpenFile *executable)
 AddrSpace::~AddrSpace()
 {
    delete [] pageTable;
+   //当一个地址空间退出时，将对应的PID值从集合中移除，
+   //并将该地址空间占用的物理页标记为可用，以便其他地址空间可以重新分配这些资源。
+    pids.erase(pid);
+    for (int i = 0; i < numPages; ++i)
+    {
+        memfreemap.Clear(pageTable[i].physicalPage);
+    }
 }
 
 //----------------------------------------------------------------------
@@ -152,7 +253,9 @@ AddrSpace::InitRegisters()
    // Set the stack register to the end of the address space, where we
    // allocated the stack; but subtract off a bit, to make sure we don't
    // accidentally reference off the end!
+   
     machine->WriteRegister(StackReg, numPages * PageSize - 16);
+    currentThread->SaveUserState();//保存用户寄存器状态，以便在上下文切换时能够恢复
     DEBUG('a', "Initializing stack register to %d\n", numPages * PageSize - 16);
 }
 
@@ -182,6 +285,7 @@ void AddrSpace::RestoreState()
 }
 
 void AddrSpace::Print() { 
+        printf("spaceId %d:", pid);
     printf("page table dump:  %d pages  in total\n", numPages);  
     printf("=============================\n");  
     printf("\tVirtPage, \tPhysPage\n"); 

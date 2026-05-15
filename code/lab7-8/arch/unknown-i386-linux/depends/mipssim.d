@@ -3,6 +3,8 @@ arch/unknown-i386-linux/depends/mipssim.d arch/unknown-i386-linux/objects/mipssi
  ../threads/bool.h ../machine/sysdep.h ../machine/translate.h \
  ../machine/disk.h ../machine/mipssim.h ../threads/system.h \
  ../threads/utility.h ../threads/thread.h ../machine/machine.h \
- ../userprog/addrspace.h ../filesys/filesys.h ../filesys/openfile.h \
- ../threads/scheduler.h ../threads/list.h ../machine/interrupt.h \
- ../threads/list.h ../machine/stats.h ../machine/timer.h
+ ../lab7-8/addrspace.h ../filesys/filesys.h ../filesys/openfile.h \
+ ../machine/translate.h ../lab7-8/syscall.h ../lab7-8/bitmap.h \
+ ../filesys/openfile.h ../threads/scheduler.h ../threads/list.h \
+ ../machine/interrupt.h ../threads/list.h ../machine/stats.h \
+ ../machine/timer.h

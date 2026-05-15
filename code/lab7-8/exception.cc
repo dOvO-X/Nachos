@@ -24,6 +24,7 @@
 #include "copyright.h"
 #include "system.h"
 #include "syscall.h"
+#include "filesys.h"
 
 //----------------------------------------------------------------------
 // ExceptionHandler
@@ -48,6 +49,16 @@
 //	are in machine.h.
 //----------------------------------------------------------------------
 
+
+void StartProcess(int baredfunc);
+
+void AdvancePC()
+{
+    machine->WriteRegister(PCReg, machine->ReadRegister(PCReg) + 4);
+    machine->WriteRegister(NextPCReg, machine->ReadRegister(NextPCReg) + 4);
+}
+
+
 void
 ExceptionHandler(ExceptionType which)
 {
@@ -56,7 +67,83 @@ ExceptionHandler(ExceptionType which)
     if ((which == SyscallException) && (type == SC_Halt)) {
 	DEBUG('a', "Shutdown, initiated by user program.\n");
    	interrupt->Halt();
-    } else {
+    } else if ((which == SyscallException) && (type == SC_Exit)) {
+        //用户程序调用Exit系统调用时，内核会执行以下操作：
+        //从寄存器中读取用户程序传递的退出码（ExitStatus）。
+        //将退出码写回寄存器，以便用户程序能够获取到退出状态。
+        //输出用户程序的PID和退出码，供调试使用。
+        //删除当前线程的地址空间，释放相关资源。
+        //调用currentThread->Finish()，结束当前线程的执行。
+        //调用AdvancePC()，将程序计数器（PC）增加4，指向下一条指令，避免重复执行Exit系统调用。   
+        DEBUG('a', "Userprog Exit");
+        int ExitStatus = machine->ReadRegister(4);
+        machine->WriteRegister(2, ExitStatus);
+        printf("用户程序%dExit with code %d\n", currentThread->space->getSpaceID(), ExitStatus);
+        delete currentThread->space;
+        currentThread->Finish();
+        AdvancePC();
+    } else if ((which == SyscallException) && (type == SC_Exec)) {
+        //用户程序调用Exec系统调用时，内核会执行以下操作：
+        //从寄存器中读取用户程序传递的参数，即要执行的可执行文件的名称。
+        //从内核文件系统中打开指定的 可执行文件，并创建一个新的地址空间（AddrSpace）对象来加载该文件。
+        //创建一个新的线程（Thread）对象，并将新创建的地址空间分配给该线程。
+        //调用新线程的Fork方法，传入StartProcess函数作为线程的入口点，开始执行新线程。
+        //调用当前线程的Yield方法，让出CPU，允许新线程运行。
+        //将新创建的地址空间的PID写回寄存器，以便用户程序能够获取到新线程的PID。
+        //调用AdvancePC()，将程序计数器（PC）增加4，指向下一条指令，避免重复执行Exec系统调用。
+        DEBUG('a', "Userprog Execute other userprog");
+        char filename[128];
+        int addr = machine->ReadRegister(4);
+        int i = 0;
+        do {
+            //read filename from mainMemory
+            machine->ReadMem(addr + i, 1, (int *) &filename[i]);
+        } while (filename[i++] != '\0');
+
+        OpenFile *executable = fileSystem->Open(filename);
+        ASSERT(executable != NULL);
+
+        AddrSpace *space = new AddrSpace(executable);
+        delete executable;
+
+        Thread *newthread = new Thread(filename);
+        newthread->setSpace(space);
+        newthread->Fork(StartProcess, 0);
+
+        currentThread->Yield();
+
+        machine->WriteRegister(2, space->getSpaceID());
+        AdvancePC();//PC 增量指向下条指令
+    } else if ((which == SyscallException) && (type == SC_Yield))
+    {
+        //用户程序调用Yield系统调用时，内核会执行以下操作：
+        //输出调试信息，表明用户程序正在调用Yield系统调用。
+        //调用currentThread->Yield()，让出CPU，允许其他线程运行。
+        //调用AdvancePC()，将程序计数器（PC）增加4，指向下一条指令，避免重复执行Yield系统调用。
+        DEBUG('a', "Userprog Yield");
+        currentThread->Yield();
+        AdvancePC();
+    } else if ((which == SyscallException) && (type == SC_Print))
+    {
+        //用户程序调用Print系统调用时，内核会执行以下操作：
+        //输出调试信息，表明用户程序正在调用Print系统调用。
+        //从寄存器中读取用户程序传递的参数，即要打印的字符串的地址。
+        //从内存中读取字符串内容，直到遇到字符串结束符（'\0'）。
+        //输出用户程序的PID和要打印的字符串，供调试使用。
+        //调用AdvancePC()，将程序计数器（PC）增加4，指向下一条指令，避免重复执行Print系统调用。
+        DEBUG('a', "Userprog Print message");
+        char str[128];
+        memset(str, 0, sizeof(str));
+        int addr = machine->ReadRegister(4);
+        int i = 0;
+        do {
+            machine->ReadMem(addr + i, 1, (int *) &str[i]);
+        } while (str[i++] != '\0');
+        //currentThread->space->Print();
+        printf("用户程序%d输出:%s\n", currentThread->space->getSpaceID(), str);
+        AdvancePC();
+    } else
+    {
 	printf("Unexpected user mode exception %d %d\n", which, type);
 	ASSERT(FALSE);
     }
