@@ -92,8 +92,8 @@ main(int argc, char **argv)//argc参数总数（含程序名），argv参数数�
     (void) Initialize(argc, argv);//system.cc->Initialize(argc, argv),初始化全局系统
     
 #ifdef THREADS
-    ThreadTest();
-#if 1
+//    ThreadTest();          // 禁用内置线程测试
+#if 0                        // 禁用内置同步测试
     SynchTest();
 #endif 
 #endif

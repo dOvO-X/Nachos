@@ -70,16 +70,15 @@ ExceptionHandler(ExceptionType which)
     } else if ((which == SyscallException) && (type == SC_Exit)) {
         //用户程序调用Exit系统调用时，内核会执行以下操作：
         //从寄存器中读取用户程序传递的退出码（ExitStatus）。
-        //将退出码写回寄存器，以便用户程序能够获取到退出状态。
-        //输出用户程序的PID和退出码，供调试使用。
-        //删除当前线程的地址空间，释放相关资源。
-        //调用currentThread->Finish()，结束当前线程的执行。
-        //调用AdvancePC()，将程序计数器（PC）增加4，指向下一条指令，避免重复执行Exit系统调用。   
+        //调用 space->Exit() 通知等待 Join 的父进程（如果存在）。
+        //如果无人 Join，则自行清理地址空间。
+        //调用 currentThread->Finish()，结束当前线程的执行。
         DEBUG('a', "Userprog Exit");
         int ExitStatus = machine->ReadRegister(4);
-        machine->WriteRegister(2, ExitStatus);
-        printf("用户程序%dExit with code %d\n", currentThread->space->getSpaceID(), ExitStatus);
-        delete currentThread->space;
+        printf("用户程序%d Exit with code %d\n", currentThread->space->getSpaceID(), ExitStatus);
+        currentThread->space->Exit(ExitStatus);     // 通知等待者（如果有）
+        if (!currentThread->space->isJoined())      // 无人 Join，自行清理
+            delete currentThread->space;
         currentThread->Finish();
         AdvancePC();
     } else if ((which == SyscallException) && (type == SC_Exec)) {
@@ -87,8 +86,7 @@ ExceptionHandler(ExceptionType which)
         //从寄存器中读取用户程序传递的参数，即要执行的可执行文件的名称。
         //从内核文件系统中打开指定的 可执行文件，并创建一个新的地址空间（AddrSpace）对象来加载该文件。
         //创建一个新的线程（Thread）对象，并将新创建的地址空间分配给该线程。
-        //调用新线程的Fork方法，传入StartProcess函数作为线程的入口点，开始执行新线程。
-        //调用当前线程的Yield方法，让出CPU，允许新线程运行。
+        //调用新线程的Fork方法，传入StartProcess函数作为线程的入口点。
         //将新创建的地址空间的PID写回寄存器，以便用户程序能够获取到新线程的PID。
         //调用AdvancePC()，将程序计数器（PC）增加4，指向下一条指令，避免重复执行Exec系统调用。
         DEBUG('a', "Userprog Execute other userprog");
@@ -110,10 +108,31 @@ ExceptionHandler(ExceptionType which)
         newthread->setSpace(space);
         newthread->Fork(StartProcess, 0);
 
-        currentThread->Yield();
+        // currentThread->Yield();
 
         machine->WriteRegister(2, space->getSpaceID());
         AdvancePC();//PC 增量指向下条指令
+    } else if ((which == SyscallException) && (type == SC_Join))
+    {
+        //用户程序调用Join系统调用时，内核会执行以下操作：
+        //从寄存器中读取目标进程的 SpaceId。
+        //通过全局映射表查找对应的 AddrSpace 对象。
+        //调用 space->Join() 等待目标进程退出，并获取其退出状态码。
+        //删除目标进程的地址空间，释放相关资源。
+        //将退出状态码写回寄存器，供用户程序使用。
+        //调用 AdvancePC()，将程序计数器（PC）增加4。
+        DEBUG('a', "Userprog Join");
+        SpaceId targetId = machine->ReadRegister(4);
+        AddrSpace *targetSpace = AddrSpace::getSpaceById(targetId);
+        int exitStatus = -1;
+        if (targetSpace != NULL) {
+            exitStatus = targetSpace->Join();   // 阻塞等待子进程退出
+            delete targetSpace;                  // Join 返回后，清理子进程资源
+        } else {
+            printf("Join: 未找到 SpaceId %d\n", targetId);
+        }
+        machine->WriteRegister(2, exitStatus);   // 返回退出状态码
+        AdvancePC();
     } else if ((which == SyscallException) && (type == SC_Yield))
     {
         //用户程序调用Yield系统调用时，内核会执行以下操作：

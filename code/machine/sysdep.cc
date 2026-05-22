@@ -25,6 +25,7 @@
 
 #include "copyright.h"
 
+#include <stdlib.h>		// for abort, exit (before extern "C" block)
 extern "C" {
 #include <stdio.h>
 #include <string.h>
@@ -85,8 +86,7 @@ int unlink(char *name);
 void srand(unsigned seed);
 int rand(void);
 unsigned sleep(unsigned);
-void abort();
-void exit(int);
+// abort and exit provided by stdlib.h
 int getpagesize();
 
 #ifndef HOST_ALPHA

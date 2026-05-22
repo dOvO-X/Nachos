@@ -6,4 +6,4 @@ arch/unknown-i386-linux/depends/addrspace.d arch/unknown-i386-linux/objects/addr
  ../machine/translate.h ../lab7-8/syscall.h ../lab7-8/bitmap.h \
  ../filesys/openfile.h ../threads/scheduler.h ../threads/list.h \
  ../machine/interrupt.h ../threads/list.h ../machine/stats.h \
- ../machine/timer.h addrspace.h ../bin/noff.h bitmap.h
+ ../machine/timer.h addrspace.h ../bin/noff.h ../threads/synch.h

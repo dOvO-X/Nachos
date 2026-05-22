@@ -19,6 +19,7 @@
 #include "system.h"
 #include "addrspace.h"
 #include "noff.h"
+#include "synch.h"
 // #include <set>
 // #include "bitmap.h"
 
@@ -28,6 +29,7 @@
 int AddrSpace::globalPid = 100;
 std::set<SpaceId> AddrSpace::pids;
 BitMap AddrSpace::memfreemap(NumPhysPages);
+std::map<SpaceId, AddrSpace*> AddrSpace::spaceMap;
 
 //----------------------------------------------------------------------
 // SwapHeader
@@ -68,6 +70,11 @@ SwapHeader (NoffHeader *noffH)
 
 AddrSpace::AddrSpace(OpenFile *executable)
 {
+    // 初始化 Join 相关的同步变量
+    exitStatus = -1;
+    joined = false;
+    joinSemaphore = new Semaphore("joinSem", 0);
+
     //为每个地址空间分配一个唯一的PID
     if (pids.count(globalPid) == 0)
     {
@@ -98,7 +105,10 @@ AddrSpace::AddrSpace(OpenFile *executable)
         if (globalPid == 1024)
             globalPid = 100;
         pids.insert(pid);
-    } 
+    }
+    // 将当前地址空间加入全局映射表，供 Join 查询
+    spaceMap[pid] = this;
+
     NoffHeader noffH;
     unsigned int i, size;
 //读取可执行文件的头部（NoffHeader）
@@ -215,14 +225,16 @@ AddrSpace::AddrSpace(OpenFile *executable)
 
 AddrSpace::~AddrSpace()
 {
-   delete [] pageTable;
    //当一个地址空间退出时，将对应的PID值从集合中移除，
    //并将该地址空间占用的物理页标记为可用，以便其他地址空间可以重新分配这些资源。
     pids.erase(pid);
+    spaceMap.erase(pid);            // 从全局映射表中移除
     for (int i = 0; i < numPages; ++i)
     {
         memfreemap.Clear(pageTable[i].physicalPage);
     }
+    delete [] pageTable;            // 最后删除页表
+    delete joinSemaphore;           // 释放信号量
 }
 
 //----------------------------------------------------------------------
@@ -282,6 +294,44 @@ void AddrSpace::RestoreState()
 {
     machine->pageTable = pageTable;
     machine->pageTableSize = numPages;
+}
+
+//----------------------------------------------------------------------
+// AddrSpace::Join
+//     等待该地址空间（进程）退出，并返回其退出状态码。
+//     调用此方法的线程将阻塞，直到目标进程调用 Exit()。
+//----------------------------------------------------------------------
+int
+AddrSpace::Join()
+{
+    joined = true;                  // 标记已被 Join
+    joinSemaphore->P();             // 等待子进程退出（信号量 V 操作）
+    return exitStatus;
+}
+
+//----------------------------------------------------------------------
+// AddrSpace::Exit
+//     设置退出状态码，并唤醒所有正在 Join 该地址空间的线程。
+//----------------------------------------------------------------------
+void
+AddrSpace::Exit(int status)
+{
+    exitStatus = status;            // 记录退出状态
+    joinSemaphore->V();             // 唤醒等待的父进程
+}
+
+//----------------------------------------------------------------------
+// AddrSpace::getSpaceById
+//     通过 SpaceId 在全局映射表中查找对应的地址空间。
+//     若未找到则返回 NULL。
+//----------------------------------------------------------------------
+AddrSpace*
+AddrSpace::getSpaceById(SpaceId id)
+{
+    std::map<SpaceId, AddrSpace*>::iterator it = spaceMap.find(id);
+    if (it != spaceMap.end())
+        return it->second;
+    return NULL;
 }
 
 void AddrSpace::Print() { 

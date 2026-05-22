@@ -33,7 +33,7 @@ StartProcess(char *filename)
     space = new AddrSpace(executable);//创建地址空间对象，将用户进程映射到核心线程
     currentThread->space = space;//将当前线程的地址空间指针 currentThread->space 设为新建的 AddrSpace对象 
 
-    //space->Print();
+    space->Print();
 
     delete executable;			// close file
 
